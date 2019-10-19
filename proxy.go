@@ -60,8 +60,6 @@ func getSession(ip string, consumer string, producer string) *Session {
 	if !exists {
 		mtx.Unlock()
 		return addSession(ip, consumer, producer)
-	} else {
-		log.Println("Session:", v)
 	}
 
 	// Update the last seen time for the Session.
@@ -223,23 +221,28 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 		apiData.Address,
 	)
 
-	log.Println("Session value:", session.paid_value)
+	diff := int64(session.paid_value - session.expected_value)
+	log.Println("Session", token, "outstanding value:", diff)
 
 	validTX := validateTransaction(session)
 	if validTX {
-		log.Println("Valid TX:", session.id, session.expected_value)
+		log.Println("Valid TX:", session.id)
+	} else {
+		http.Error(w, http.StatusText(402), http.StatusPaymentRequired)
+		log.Println("Payment required:", session.id)
+		return
 	}
+
 	limiter := session.limiter
-	if limiter.Allow() == false || !validTX {
+	if limiter.Allow() == false {
 		http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
+		log.Println("Rate limit exceeded:", session.id)
 		return
 	}
 
 	log.Println("Getting path", path, "from Endpoint with ID", id)
-
 	req.Host = ""
 	req.URL.Path = path
-
 	p.ServeHTTP(w, req)
 }
 
