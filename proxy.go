@@ -1,6 +1,7 @@
 package main
 
 import(
+	"os"
 	"fmt"
 	"time"
 	"sync"
@@ -153,6 +154,9 @@ func get_balance_handler(w http.ResponseWriter, req *http.Request) {
 }
 
 func proxy_handler(w http.ResponseWriter, req *http.Request) {
+	producer_balance := GetBalance(os.Getenv("ADDRESS_PRODUCER"))
+	log.Println("Producer balance:", producer_balance)
+
 	limiter := getVisitor(req.RemoteAddr)
 	if limiter.Allow() == false {
 			http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
