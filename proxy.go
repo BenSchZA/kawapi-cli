@@ -169,7 +169,7 @@ func main() {
 
 	router = mux.NewRouter()
 	router.HandleFunc("/balance/{address}", get_balance_handler)
-	router.HandleFunc("/endpoint/{id}/{path:.*}", proxy_handler)
+	router.HandleFunc("/{token}/endpoint/{id}/{path:.*}", proxy_handler)
 
 	err = http.ListenAndServe(":8080", router)
 	if err != nil {
@@ -189,6 +189,7 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	// Use IP for now
 	// key := vars["apiKey"] //TODO: we need to generate an API key with consumer seed for Session
+	token := vars["token"]
 	id := vars["id"]
 	path := vars["path"]
 
@@ -217,7 +218,7 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	session := getSession(
-		req.RemoteAddr, 
+		token, //req.RemoteAddr, 
 		"JXBIEWEBYCZOKBHIGDXT9VNLUTGCZGXJLCSAUTCRGEEHFETHRIVMTBNKGPQUXNVSCLIWEKHWFBASGYFLWZOGJE9YPX", 
 		apiData.Address,
 	)
