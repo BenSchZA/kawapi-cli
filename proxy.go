@@ -2,6 +2,7 @@ package main
 
 import(
 	"os"
+	"fmt"
 	"time"
 	"sync"
 	"log"
@@ -15,6 +16,7 @@ import(
 	// "github.com/didip/tollbooth"
 	// "github.com/throttled/throttled"
 	"golang.org/x/time/rate"
+	"github.com/boltdb/bolt"
 )
 
 var endpoint = os.Getenv("API")
@@ -75,7 +77,58 @@ func cleanupVisitors() {
 	}
 }
 
+type api struct {
+	id  string
+	url string
+}
+
+var seeds =  []api {
+	api {
+		id: "a",
+		url:  "https://alpha-api-nightly.mol.ai",
+	},
+	api {
+		id: "b",
+		url:  "https://google.com",
+	},
+}
+
+func seed_db(db *bolt.DB) {
+	err := db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("APIS"))
+		var err error
+		for _, api := range seeds {
+			err = b.Put([]byte(api.id), []byte(api.url))
+			must(err)
+		}
+		return err
+	})
+	must(err)
+}
+
 func main() {
+	db, err := bolt.Open("store.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
+	if err != nil {
+		log.Fatal(err)
+	}
+	db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucket([]byte("APIS"))
+		if err != nil {
+			return fmt.Errorf("Create bucket: %s", err)
+		}
+		return nil
+	})
+	defer db.Close()
+
+	seed_db(db)
+
+	db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("APIS"))
+		v := b.Get([]byte("a"))
+		fmt.Printf("Value for key 'a': %s\n", v)
+		return nil
+	})
+
 	remote, err := url.Parse("https://alpha-api-nightly.mol.ai")
 	if err != nil {
 		panic(err)

@@ -5,6 +5,8 @@ github.com/alecthomas/gozmq v0.0.0-20140622232202-d1b01a2df6b2 h1:avoSu+wd97LeIY
 github.com/alecthomas/gozmq v0.0.0-20140622232202-d1b01a2df6b2/go.mod h1:4M6gCnOnuQEAVnqf5I1tc+/6c6ZiScidY+LkurMUcbY=
 github.com/apsdehal/go-logger v0.0.0-20190506062552-f85330a4b532/go.mod h1:U3/8D6R9+bVpX0ORZjV+3mU9pQ86m7h1lESgJbXNvXA=
 github.com/beevik/ntp v0.2.0/go.mod h1:hIHWr+l3+/clUnF44zdK+CWW7fO8dR5cIylAQ76NRpg=
+github.com/boltdb/bolt v1.3.1 h1:JQmyP4ZBrce+ZQu0dY660FMfatumYDLun9hBCUVIkF4=
+github.com/boltdb/bolt v1.3.1/go.mod h1:clJnj/oiGkjum5o1McbSZDSLxVThjynRyGBgiAx27Ps=
 github.com/cespare/xxhash v1.1.0 h1:a6HrQnmkObjyL+Gs60czilIUGqrzKutQD6XZog3p+ko=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
