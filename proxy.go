@@ -33,11 +33,13 @@ func addSession(ip string, consumer string, producer string) *Session {
 	limiter := rate.NewLimiter(2, 5)
 	mtx.Lock()
 	// Include the current time when creating a new Session.
-	value := Session{
-		limiter: limiter, 
+	value := Session {
+		id: ip,
+		limiter: limiter,
 		lastSeen: time.Now(),
 		consumer: consumer,
 		producer: producer,
+		initial_value: GetBalance(consumer),
 		paid_value: 0,
 		expected_value: 0,
 	}
@@ -75,6 +77,20 @@ func cleanupSessions() {
 			}
 		}
 		mtx.Unlock()
+	}
+}
+
+var txPrice uint64 = 1
+var txBuffer uint64 = 10
+
+func validateTransaction(session *Session) bool {
+	session.expected_value = session.expected_value + txPrice
+	session.paid_value = GetBalance(session.consumer) - session.initial_value //TODO: set as tx between
+	sessions[session.id] = session
+	if session.expected_value - session.paid_value > txBuffer {
+		return false
+	} else {
+		return true
 	}
 }
 
@@ -174,9 +190,17 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 	id := vars["id"]
 	path := vars["path"]
 	
-	session := getSession(req.RemoteAddr, "ABC", "DEF")
+	session := getSession(
+		req.RemoteAddr, 
+		"JXBIEWEBYCZOKBHIGDXT9VNLUTGCZGXJLCSAUTCRGEEHFETHRIVMTBNKGPQUXNVSCLIWEKHWFBASGYFLWZOGJE9YPX", 
+		"DEF",
+	)
+	validTX := validateTransaction(session)
+	if validTX {
+		log.Println("Valid TX:", session.id, session.expected_value)
+	}
 	limiter := session.limiter
-	if limiter.Allow() == false {
+	if limiter.Allow() == false || !validTX {
 		http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
 		return
 	}
