@@ -1,7 +1,6 @@
 package main
 
 import(
-	"os"
 	"fmt"
 	"time"
 	"sync"
@@ -10,7 +9,6 @@ import(
 	"net/http"
 	"net/http/httputil"
 
-	. "github.com/iotaledger/iota.go/api"
 	"github.com/iotaledger/iota.go/trinary"
 	"github.com/gorilla/mux"
 	// "github.com/didip/tollbooth"
@@ -18,8 +16,6 @@ import(
 	"golang.org/x/time/rate"
 	"github.com/boltdb/bolt"
 )
-
-var endpoint = os.Getenv("API")
 
 //https://www.alexedwards.net/blog/how-to-rate-limit-http-requests
 
@@ -139,7 +135,7 @@ func main() {
 	})
 
 	router = mux.NewRouter()
-	router.HandleFunc("/balance/{address}", get_balance)
+	router.HandleFunc("/balance/{address}", get_balance_handler)
 	router.HandleFunc("/endpoint/{id}/{path:.*}", proxy_handler)
 
 	err = http.ListenAndServe(":8080", router)
@@ -148,20 +144,12 @@ func main() {
 	}
 }
 
-func get_balance(w http.ResponseWriter, req *http.Request) {
+func get_balance_handler(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 
-	api, err := ComposeAPI(HTTPClientSettings{URI: endpoint})
-  must(err)
-    
-	// GetNewAddress retrieves the first unspent from address through IRI
-	// The 100 argument represents only fully confirmed transactions
 	address := trinary.Trytes(vars["address"])
-	log.Println(address)
-
-	balances, err := api.GetBalances(trinary.Hashes{address}, 100)
-	must(err)
-	log.Println("\nBalance:", balances.Balances[0], " - According to milestone", balances.MilestoneIndex)
+	balance := GetBalance(address)
+	log.Println("Balance:", balance)
 }
 
 func proxy_handler(w http.ResponseWriter, req *http.Request) {
