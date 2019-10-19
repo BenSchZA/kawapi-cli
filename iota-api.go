@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"log"
 
 	. "github.com/iotaledger/iota.go/api"
 	"github.com/iotaledger/iota.go/trinary"
@@ -15,7 +14,6 @@ func GetBalance(address trinary.Trytes) uint64 {
 	// The 100 argument represents only fully confirmed transactions
 	api, err := ComposeAPI(HTTPClientSettings{URI: endpoint})
 	must(err)
-	log.Println("Address:", address)
 
 	balances, err := api.GetBalances(trinary.Hashes{address}, 100)
 	must(err)

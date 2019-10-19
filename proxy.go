@@ -1,7 +1,6 @@
 package main
 
 import(
-	"os"
 	"fmt"
 	"time"
 	"sync"
@@ -9,6 +8,7 @@ import(
 	"net/url"
 	"net/http"
 	"net/http/httputil"
+	"encoding/json"
 
 	"github.com/iotaledger/iota.go/trinary"
 	"github.com/gorilla/mux"
@@ -40,15 +40,15 @@ func init() {
 	go cleanupSessions()
 }
 
-func addSession(ip string) *session {
+func addSession(ip string, consumer string, producer string) *session {
 	limiter := rate.NewLimiter(2, 5)
 	mtx.Lock()
 	// Include the current time when creating a new session.
 	value := session{
 		limiter: limiter, 
 		lastSeen: time.Now(),
-		consumer: "consumer",
-		producer: "producer",
+		consumer: consumer,
+		producer: producer,
 		paid_value: 0,
 		expected_value: 0,
 	}
@@ -58,12 +58,14 @@ func addSession(ip string) *session {
 	return &value
 }
 
-func getSession(ip string) *session {
+func getSession(ip string, consumer string, producer string) *session {
 	mtx.Lock()
 	v, exists := sessions[ip]
 	if !exists {
 		mtx.Unlock()
-		return addSession(ip)
+		return addSession(ip, consumer, producer)
+	} else {
+		log.Println("Session:", v)
 	}
 
 	// Update the last seen time for the session.
@@ -87,19 +89,22 @@ func cleanupSessions() {
 	}
 }
 
-type api struct {
-	id  string
-	url string
+type Endpoint struct {
+	Id  string
+	Url string
+	Address string
 }
 
-var seeds =  []api {
-	api {
-		id: "a",
-		url:  "https://alpha-api-nightly.mol.ai",
+var seeds =  []Endpoint {
+	Endpoint {
+		Id: "a",
+		Url:  "https://alpha-api-nightly.mol.ai",
+		Address: "FMYHLHBSJJMJZNPVUOKDCUSFOPQAGPBSPOPMFVBGXUUDFPEWPXREZFQKGKSNHZWDMODRDYWIXQT9CLVBXGPANCSYBW",
 	},
-	api {
-		id: "b",
-		url:  "https://google.com",
+	Endpoint {
+		Id: "b",
+		Url:  "https://google.com",
+		Address: "FMYHLHBSJJMJZNPVUOKDCUSFOPQAGPBSPOPMFVBGXUUDFPEWPXREZFQKGKSNHZWDMODRDYWIXQT9CLVBXGPANCSYBW",
 	},
 }
 
@@ -108,7 +113,11 @@ func seed_db(db *bolt.DB) {
 		b := tx.Bucket([]byte("APIS"))
 		var err error
 		for _, api := range seeds {
-			err = b.Put([]byte(api.id), []byte(api.url))
+			encoded, err_json := json.Marshal(api)
+			must(err_json)
+			log.Println("Seeding:", api.Id, api)
+			
+			err = b.Put([]byte(api.Id), encoded)
 			must(err)
 		}
 		return err
@@ -118,14 +127,14 @@ func seed_db(db *bolt.DB) {
 
 func create_buckets(db *bolt.DB) {
 	db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucket([]byte("Sessions"))
+		_, err := tx.CreateBucketIfNotExists([]byte("Sessions"))
 		if err != nil {
 			return fmt.Errorf("Create bucket: %s", err)
 		}
 		return nil
 	})
 	db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucket([]byte("APIS"))
+		_, err := tx.CreateBucketIfNotExists([]byte("APIS"))
 		if err != nil {
 			return fmt.Errorf("Create bucket: %s", err)
 		}
@@ -151,7 +160,9 @@ func main() {
 	db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("APIS"))
 		v := b.Get([]byte("a"))
-		fmt.Printf("Value for key 'a': %s\n", v)
+		var data *Endpoint
+		json.Unmarshal(v, &data)
+		fmt.Printf("Value for key 'a': %s\n", data)
 		return nil
 	})
 
@@ -164,33 +175,6 @@ func main() {
 		panic(err)
 	}
 }
-
-// struct session {
-// 	key string
-// 	expiry time.Time
-// 	consumer string
-// 	producer string
-// 	paid_value uint64
-// 	expected_value uint64
-// }
-// func purgeExpiredSessions(db *bolt.DB) {
-// 	db.Update(func(tx *bolt.Tx) error {
-// 		// Assume bucket exists and has keys
-// 		b := tx.Bucket([]byte("Sessions"))
-// 		c := b.Cursor()
-	
-// 		now := time.Now()
-// 		for k, v := c.First(); k != nil; k, v = c.Next() {
-// 			fmt.Printf("key=%s, value=%s\n", k, v)
-// 			if v.expiry.After(now) {
-// 				fmt.Printf("Purging session:", k)
-// 				c.Delete()
-// 			}
-// 		}
-		
-// 		return nil
-// 	})
-// }
 
 func get_balance_handler(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
@@ -207,29 +191,37 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 	id := vars["id"]
 	path := vars["path"]
 	
-	session := getSession(req.RemoteAddr)
+	session := getSession(req.RemoteAddr, "ABC", "DEF")
 	limiter := session.limiter
 	if limiter.Allow() == false {
 		http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
 		return
 	}
 
-	producer_balance := GetBalance(os.Getenv("ADDRESS_PRODUCER"))
-	log.Println("Producer balance:", producer_balance)
-
 	var p *httputil.ReverseProxy
 
 	db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("APIS"))
 		v := b.Get([]byte(id))
-		fmt.Printf("API: %s\n", v)
-		remote, err := url.Parse(string(v))
+
+		var apiData *Endpoint
+		if err := json.Unmarshal(v, &apiData); err != nil {
+			panic(err)
+		}
+
+		log.Println("Endpoint:", apiData)
+
+		remote, err := url.Parse(string(apiData.Url))
 		must(err)
 		p = httputil.NewSingleHostReverseProxy(remote)
+
+		producer_balance := GetBalance(apiData.Address)
+		log.Println("Producer balance:", producer_balance)
+
 		return nil
 	})
 
-	log.Println("Getting path", path, "from API with ID", id)
+	log.Println("Getting path", path, "from Endpoint with ID", id)
 
 	req.Host = ""
 	req.URL.Path = path
