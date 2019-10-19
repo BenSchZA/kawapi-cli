@@ -228,10 +228,15 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 	validTX := validateTransaction(session)
 	if validTX {
 		log.Println("Valid TX:", session.id, session.expected_value)
+	} else {
+		http.Error(w, http.StatusText(402), http.StatusPaymentRequired)
+		log.Println("Payment required:", session.id)
+		return
 	}
 	limiter := session.limiter
-	if limiter.Allow() == false || !validTX {
+	if limiter.Allow() == false {
 		http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
+		log.Println("Rate limit exceeded:", session.id)
 		return
 	}
 
