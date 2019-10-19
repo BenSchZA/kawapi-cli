@@ -106,8 +106,12 @@ func seed_db(db *bolt.DB) {
 	must(err)
 }
 
+var db *bolt.DB
+var router *mux.Router
+
 func main() {
-	db, err := bolt.Open("store.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
+	var err error
+	db, err = bolt.Open("store.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -119,7 +123,6 @@ func main() {
 		return nil
 	})
 	defer db.Close()
-
 	seed_db(db)
 
 	db.View(func(tx *bolt.Tx) error {
@@ -129,16 +132,9 @@ func main() {
 		return nil
 	})
 
-	remote, err := url.Parse("https://alpha-api-nightly.mol.ai")
-	if err != nil {
-		panic(err)
-	}
-
-	proxy := httputil.NewSingleHostReverseProxy(remote)
-	router := mux.NewRouter()
-	
+	router = mux.NewRouter()
 	router.HandleFunc("/balance/{address}", get_balance)
-	router.PathPrefix("/endpoint/{id}/{path:.*}").HandlerFunc(handler(proxy))
+	router.HandleFunc("/endpoint/{id}/{path:.*}", proxy_handler)
 
 	err = http.ListenAndServe(":8080", router)
 	if err != nil {
@@ -162,25 +158,35 @@ func get_balance(w http.ResponseWriter, req *http.Request) {
 	log.Println("\nBalance:", balances.Balances[0], " - According to milestone", balances.MilestoneIndex)
 }
 
-func handler(p *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		limiter := getVisitor(r.RemoteAddr)
-		if limiter.Allow() == false {
-				http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
-				return
-		}
-		
-		vars := mux.Vars(r)
-		id := vars["id"]
-		path := vars["path"]
-
-		log.Println("Getting", path, "from API with ID", id)
-
-		r.Host = ""
-		r.URL.Path = path
-
-		p.ServeHTTP(w, r)
+func proxy_handler(w http.ResponseWriter, req *http.Request) {
+	limiter := getVisitor(req.RemoteAddr)
+	if limiter.Allow() == false {
+			http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
+			return
 	}
+	
+	vars := mux.Vars(req)
+	id := vars["id"]
+	path := vars["path"]
+
+	var p *httputil.ReverseProxy
+
+	db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("APIS"))
+		v := b.Get([]byte(id))
+		fmt.Printf("API: %s\n", v)
+		remote, err := url.Parse(string(v))
+		must(err)
+		p = httputil.NewSingleHostReverseProxy(remote)
+		return nil
+	})
+
+	log.Println("Getting", path, "from API with ID", id)
+
+	req.Host = ""
+	req.URL.Path = path
+
+	p.ServeHTTP(w, req)
 }
 
 func must(err error) {
