@@ -189,31 +189,16 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 	// key := vars["apiKey"] //TODO: we need to generate an API key with consumer seed for Session
 	id := vars["id"]
 	path := vars["path"]
-	
-	session := getSession(
-		req.RemoteAddr, 
-		"JXBIEWEBYCZOKBHIGDXT9VNLUTGCZGXJLCSAUTCRGEEHFETHRIVMTBNKGPQUXNVSCLIWEKHWFBASGYFLWZOGJE9YPX", 
-		"DEF",
-	)
-	validTX := validateTransaction(session)
-	if validTX {
-		log.Println("Valid TX:", session.id, session.expected_value)
-	}
-	limiter := session.limiter
-	if limiter.Allow() == false || !validTX {
-		http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
-		return
-	}
 
 	var p *httputil.ReverseProxy
+	var apiData *Endpoint
 
-	db.View(func(tx *bolt.Tx) error {
+	err_endpoint := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("APIS"))
 		v := b.Get([]byte(id))
 
-		var apiData *Endpoint
 		if err := json.Unmarshal(v, &apiData); err != nil {
-			panic(err)
+			return err
 		}
 
 		log.Println("Endpoint:", apiData)
@@ -227,6 +212,25 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 
 		return nil
 	})
+	if err_endpoint != nil {
+		http.Error(w, http.StatusText(404), http.StatusNotFound)
+		return
+	}
+
+	session := getSession(
+		req.RemoteAddr, 
+		"JXBIEWEBYCZOKBHIGDXT9VNLUTGCZGXJLCSAUTCRGEEHFETHRIVMTBNKGPQUXNVSCLIWEKHWFBASGYFLWZOGJE9YPX", 
+		apiData.Address,
+	)
+	validTX := validateTransaction(session)
+	if validTX {
+		log.Println("Valid TX:", session.id, session.expected_value)
+	}
+	limiter := session.limiter
+	if limiter.Allow() == false || !validTX {
+		http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
+		return
+	}
 
 	log.Println("Getting path", path, "from Endpoint with ID", id)
 
