@@ -106,6 +106,16 @@ func seed_db(db *bolt.DB) {
 	must(err)
 }
 
+func create_bucket(db *bolt.DB) {
+	db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucket([]byte("APIS"))
+		if err != nil {
+			return fmt.Errorf("Create bucket: %s", err)
+		}
+		return nil
+	})
+}
+
 var db *bolt.DB
 var router *mux.Router
 
@@ -115,14 +125,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucket([]byte("APIS"))
-		if err != nil {
-			return fmt.Errorf("Create bucket: %s", err)
-		}
-		return nil
-	})
 	defer db.Close()
+
+	// Initialize datastore
+	create_bucket(db)
 	seed_db(db)
 
 	db.View(func(tx *bolt.Tx) error {
@@ -181,7 +187,7 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 		return nil
 	})
 
-	log.Println("Getting", path, "from API with ID", id)
+	log.Println("Getting path", path, "from API with ID", id)
 
 	req.Host = ""
 	req.URL.Path = path
