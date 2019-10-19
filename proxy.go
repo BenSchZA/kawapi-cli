@@ -20,19 +20,8 @@ import(
 
 //https://www.alexedwards.net/blog/how-to-rate-limit-http-requests
 
-// Create a custom session struct which holds the rate limiter for each
-// session and the last time that the session was seen.
-type session struct {
-	limiter  *rate.Limiter
-	lastSeen time.Time
-	consumer string
-	producer string
-	paid_value uint64
-	expected_value uint64
-}
-
-// Change the the map to hold values of the type session.
-var sessions = make(map[string]*session)
+// Change the the map to hold values of the type Session.
+var sessions = make(map[string]*Session)
 var mtx sync.Mutex
 
 // Run a background goroutine to remove old entries from the sessions map.
@@ -40,11 +29,11 @@ func init() {
 	go cleanupSessions()
 }
 
-func addSession(ip string, consumer string, producer string) *session {
+func addSession(ip string, consumer string, producer string) *Session {
 	limiter := rate.NewLimiter(2, 5)
 	mtx.Lock()
-	// Include the current time when creating a new session.
-	value := session{
+	// Include the current time when creating a new Session.
+	value := Session{
 		limiter: limiter, 
 		lastSeen: time.Now(),
 		consumer: consumer,
@@ -54,11 +43,11 @@ func addSession(ip string, consumer string, producer string) *session {
 	}
 	sessions[ip] = &value
 	mtx.Unlock()
-	log.Println("New session:", ip)
+	log.Println("New Session:", ip)
 	return &value
 }
 
-func getSession(ip string, consumer string, producer string) *session {
+func getSession(ip string, consumer string, producer string) *Session {
 	mtx.Lock()
 	v, exists := sessions[ip]
 	if !exists {
@@ -68,7 +57,7 @@ func getSession(ip string, consumer string, producer string) *session {
 		log.Println("Session:", v)
 	}
 
-	// Update the last seen time for the session.
+	// Update the last seen time for the Session.
 	v.lastSeen = time.Now()
 	mtx.Unlock()
 	return v
@@ -87,12 +76,6 @@ func cleanupSessions() {
 		}
 		mtx.Unlock()
 	}
-}
-
-type Endpoint struct {
-	Id  string
-	Url string
-	Address string
 }
 
 var seeds =  []Endpoint {
@@ -187,7 +170,7 @@ func get_balance_handler(w http.ResponseWriter, req *http.Request) {
 func proxy_handler(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	// Use IP for now
-	// key := vars["apiKey"] //TODO: we need to generate an API key with consumer seed for session
+	// key := vars["apiKey"] //TODO: we need to generate an API key with consumer seed for Session
 	id := vars["id"]
 	path := vars["path"]
 	
