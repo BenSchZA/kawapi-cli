@@ -223,16 +223,18 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 		apiData.Address,
 	)
 
-	log.Println("Session value:", session.paid_value)
+	diff := int64(session.paid_value - session.expected_value)
+	log.Println("Session", token, "outstanding value:", diff)
 
 	validTX := validateTransaction(session)
 	if validTX {
-		log.Println("Valid TX:", session.id, session.expected_value)
+		log.Println("Valid TX:", session.id)
 	} else {
 		http.Error(w, http.StatusText(402), http.StatusPaymentRequired)
 		log.Println("Payment required:", session.id)
 		return
 	}
+
 	limiter := session.limiter
 	if limiter.Allow() == false {
 		http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
@@ -241,10 +243,8 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	log.Println("Getting path", path, "from Endpoint with ID", id)
-
 	req.Host = ""
 	req.URL.Path = path
-
 	p.ServeHTTP(w, req)
 }
 
