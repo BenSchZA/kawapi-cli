@@ -1,0 +1,8 @@
+*.swp
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+.envrc
+.history/
