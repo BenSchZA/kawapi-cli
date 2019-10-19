@@ -4,6 +4,8 @@
 *.dylib
 *.test
 *.out
+*.exe
+*.lock
 .envrc
 .history/
 store.db
