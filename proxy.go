@@ -18,6 +18,11 @@ import(
 	"github.com/boltdb/bolt"
 )
 
+var txPrice uint64 = 1
+var txBuffer uint64 = 10
+var txRate rate.Limit = 2
+var txBurst int = 5
+
 //https://www.alexedwards.net/blog/how-to-rate-limit-http-requests
 
 // Change the the map to hold values of the type Session.
@@ -30,7 +35,7 @@ func init() {
 }
 
 func addSession(ip string, consumer string, producer string) *Session {
-	limiter := rate.NewLimiter(2, 5)
+	limiter := rate.NewLimiter(txRate, txBurst)
 	mtx.Lock()
 	// Include the current time when creating a new Session.
 	value := Session {
@@ -79,9 +84,6 @@ func cleanupSessions() {
 		mtx.Unlock()
 	}
 }
-
-var txPrice uint64 = 1
-var txBuffer uint64 = 10
 
 func validateTransaction(session *Session) bool {
 	session.expected_value = session.expected_value + txPrice
