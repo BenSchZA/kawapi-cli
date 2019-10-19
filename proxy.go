@@ -60,8 +60,6 @@ func getSession(ip string, consumer string, producer string) *Session {
 	if !exists {
 		mtx.Unlock()
 		return addSession(ip, consumer, producer)
-	} else {
-		log.Println("Session:", v)
 	}
 
 	// Update the last seen time for the Session.
