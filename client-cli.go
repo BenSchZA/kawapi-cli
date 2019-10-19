@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -19,36 +20,39 @@ func info() {
 	app.Version = "1.0.0"
 }
 
-type Endpoint struct {
-	Id      string
-	Url     string
-	Address string
-}
-
 func getDataSources() []Endpoint {
-	resp, err := http.Get("http://localhost:8080/datasets")
+	resp, err := http.Get("http://localhost:8080/endpoint")
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
+
 	if err != nil {
 		log.Fatal(err)
 	}
+	var results []Endpoint
+	jsonerr := json.Unmarshal(body, &results)
 
-	var endpoints []Endpoint
-	json.Unmarshal(body, &endpoints)
-
-	return endpoints
+	if jsonerr != nil {
+		log.Fatal(jsonerr)
+	}
+	return results
 }
 
 func main() {
 	info()
 	var endpoints = getDataSources()
-	fmt.Println(endpoints)
+	fmt.Println("Please select an endpoint:")
+	for _, element := range endpoints {
+		fmt.Println(element.Id, " - ", element.Url)
+	}
 
+	reader := bufio.NewReader(os.Stdin)
+	text, _ := reader.ReadString('\n')
+
+	fmt.Printf("You selected %s", text)
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)

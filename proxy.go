@@ -157,18 +157,10 @@ func main() {
 	create_buckets(db)
 	seed_db(db)
 
-	db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("APIS"))
-		v := b.Get([]byte("a"))
-		var data *Endpoint
-		json.Unmarshal(v, &data)
-		fmt.Printf("Value for key 'a': %s\n", data)
-		return nil
-	})
-
 	router = mux.NewRouter()
 	router.HandleFunc("/balance/{address}", get_balance_handler)
 	router.HandleFunc("/endpoint/{id}/{path:.*}", proxy_handler)
+	router.HandleFunc("/endpoint", get_endpoints_handler)
 
 	err = http.ListenAndServe(":8080", router)
 	if err != nil {
@@ -182,6 +174,32 @@ func get_balance_handler(w http.ResponseWriter, req *http.Request) {
 	address := trinary.Trytes(vars["address"])
 	balance := GetBalance(address)
 	log.Println("Balance:", balance)
+}
+
+func get_endpoints_handler(w http.ResponseWriter, req *http.Request) {
+	var endpoints []Endpoint
+	log.Println("getting endpoints")
+
+	db.View(func(tx *bolt.Tx) error {
+		// Assume bucket exists and has keys
+		b := tx.Bucket([]byte("APIS"))
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			var apiData Endpoint
+			if err := json.Unmarshal(v, &apiData); err != nil {
+				return err
+			}
+			endpoints = append(endpoints, apiData)
+		}
+		return nil
+	})
+
+	body, err := json.Marshal(endpoints)
+
+	if err != nil {
+
+	}
+	w.Write([]byte(body))
 }
 
 func proxy_handler(w http.ResponseWriter, req *http.Request) {
