@@ -11,5 +11,8 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/throttled/throttled v2.2.4+incompatible // indirect
+	github.com/urfave/cli v1.22.1 // indirect
 	golang.org/x/time v0.0.0-20190921001708-c4c64cad1fd0 // indirect
 )
+
+go 1.13

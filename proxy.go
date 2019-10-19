@@ -1,22 +1,23 @@
 package main
 
-import(
-	"os"
+import (
 	"fmt"
-	"time"
-	"sync"
 	"log"
-	"net/url"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
+	"os"
+	"sync"
+	"time"
 
+	"github.com/gorilla/mux"
 	. "github.com/iotaledger/iota.go/api"
 	"github.com/iotaledger/iota.go/trinary"
-	"github.com/gorilla/mux"
+
 	// "github.com/didip/tollbooth"
 	// "github.com/throttled/throttled"
-	"golang.org/x/time/rate"
 	"github.com/boltdb/bolt"
+	"golang.org/x/time/rate"
 )
 
 var endpoint = os.Getenv("API")
@@ -82,14 +83,14 @@ type api struct {
 	url string
 }
 
-var seeds =  []api {
-	api {
-		id: "a",
-		url:  "https://alpha-api-nightly.mol.ai",
+var seeds = []api{
+	api{
+		id:  "a",
+		url: "https://alpha-api-nightly.mol.ai",
 	},
-	api {
-		id: "b",
-		url:  "https://google.com",
+	api{
+		id:  "b",
+		url: "https://google.com",
 	},
 }
 
@@ -136,7 +137,7 @@ func main() {
 
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 	router := mux.NewRouter()
-	
+
 	router.HandleFunc("/balance/{address}", get_balance)
 	router.PathPrefix("/endpoint/{id}/{path:.*}").HandlerFunc(handler(proxy))
 
@@ -150,8 +151,8 @@ func get_balance(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 
 	api, err := ComposeAPI(HTTPClientSettings{URI: endpoint})
-  must(err)
-    
+	must(err)
+
 	// GetNewAddress retrieves the first unspent from address through IRI
 	// The 100 argument represents only fully confirmed transactions
 	address := trinary.Trytes(vars["address"])
@@ -166,10 +167,10 @@ func handler(p *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) 
 	return func(w http.ResponseWriter, r *http.Request) {
 		limiter := getVisitor(r.RemoteAddr)
 		if limiter.Allow() == false {
-				http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
-				return
+			http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
+			return
 		}
-		
+
 		vars := mux.Vars(r)
 		id := vars["id"]
 		path := vars["path"]
@@ -185,6 +186,6 @@ func handler(p *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) 
 
 func must(err error) {
 	if err != nil {
-			panic(err)
+		panic(err)
 	}
 }
