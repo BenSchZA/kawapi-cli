@@ -1,17 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
 	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
-	. "github.com/iotaledger/iota.go/api"
 	"github.com/iotaledger/iota.go/trinary"
 
 	// "github.com/didip/tollbooth"
@@ -20,77 +19,92 @@ import (
 	"golang.org/x/time/rate"
 )
 
-var endpoint = os.Getenv("API")
-
 //https://www.alexedwards.net/blog/how-to-rate-limit-http-requests
 
-// Create a custom visitor struct which holds the rate limiter for each
-// visitor and the last time that the visitor was seen.
-type visitor struct {
-	limiter  *rate.Limiter
-	lastSeen time.Time
-}
-
-// Change the the map to hold values of the type visitor.
-var visitors = make(map[string]*visitor)
+// Change the the map to hold values of the type Session.
+var sessions = make(map[string]*Session)
 var mtx sync.Mutex
 
-// Run a background goroutine to remove old entries from the visitors map.
+// Run a background goroutine to remove old entries from the sessions map.
 func init() {
-	go cleanupVisitors()
+	go cleanupSessions()
 }
 
-func addVisitor(ip string) *rate.Limiter {
+func addSession(ip string, consumer string, producer string) *Session {
 	limiter := rate.NewLimiter(2, 5)
 	mtx.Lock()
-	// Include the current time when creating a new visitor.
-	visitors[ip] = &visitor{limiter, time.Now()}
+	// Include the current time when creating a new Session.
+	value := Session{
+		id:             ip,
+		limiter:        limiter,
+		lastSeen:       time.Now(),
+		consumer:       consumer,
+		producer:       producer,
+		initial_value:  GetBalance(consumer),
+		paid_value:     0,
+		expected_value: 0,
+	}
+	sessions[ip] = &value
 	mtx.Unlock()
-	return limiter
+	log.Println("New Session:", ip)
+	return &value
 }
 
-func getVisitor(ip string) *rate.Limiter {
+func getSession(ip string, consumer string, producer string) *Session {
 	mtx.Lock()
-	v, exists := visitors[ip]
+	v, exists := sessions[ip]
 	if !exists {
 		mtx.Unlock()
-		return addVisitor(ip)
+		return addSession(ip, consumer, producer)
+	} else {
+		log.Println("Session:", v)
 	}
 
-	// Update the last seen time for the visitor.
+	// Update the last seen time for the Session.
 	v.lastSeen = time.Now()
 	mtx.Unlock()
-	return v.limiter
+	return v
 }
 
-// Every minute check the map for visitors that haven't been seen for
-// more than 3 minutes and delete the entries.
-func cleanupVisitors() {
+// Every minute check the map for sessions that haven't been seen for
+// more than 10 minutes and delete the entries.
+func cleanupSessions() {
 	for {
 		time.Sleep(time.Minute)
 		mtx.Lock()
-		for ip, v := range visitors {
-			if time.Now().Sub(v.lastSeen) > 3*time.Minute {
-				delete(visitors, ip)
+		for ip, v := range sessions {
+			if time.Now().Sub(v.lastSeen) > 10*time.Minute {
+				delete(sessions, ip)
 			}
 		}
 		mtx.Unlock()
 	}
 }
 
-type api struct {
-	id  string
-	url string
+var txPrice uint64 = 1
+var txBuffer uint64 = 10
+
+func validateTransaction(session *Session) bool {
+	session.expected_value = session.expected_value + txPrice
+	session.paid_value = GetBalance(session.consumer) - session.initial_value //TODO: set as tx between
+	sessions[session.id] = session
+	if session.expected_value-session.paid_value > txBuffer {
+		return false
+	} else {
+		return true
+	}
 }
 
-var seeds = []api{
-	api{
-		id:  "a",
-		url: "https://alpha-api-nightly.mol.ai",
+var seeds = []Endpoint{
+	Endpoint{
+		Id:      "a",
+		Url:     "https://alpha-api-nightly.mol.ai",
+		Address: "FMYHLHBSJJMJZNPVUOKDCUSFOPQAGPBSPOPMFVBGXUUDFPEWPXREZFQKGKSNHZWDMODRDYWIXQT9CLVBXGPANCSYBW",
 	},
-	api{
-		id:  "b",
-		url: "https://google.com",
+	Endpoint{
+		Id:      "b",
+		Url:     "https://google.com",
+		Address: "FMYHLHBSJJMJZNPVUOKDCUSFOPQAGPBSPOPMFVBGXUUDFPEWPXREZFQKGKSNHZWDMODRDYWIXQT9CLVBXGPANCSYBW",
 	},
 }
 
@@ -99,7 +113,11 @@ func seed_db(db *bolt.DB) {
 		b := tx.Bucket([]byte("APIS"))
 		var err error
 		for _, api := range seeds {
-			err = b.Put([]byte(api.id), []byte(api.url))
+			encoded, err_json := json.Marshal(api)
+			must(err_json)
+			log.Println("Seeding:", api.Id, api)
+
+			err = b.Put([]byte(api.Id), encoded)
 			must(err)
 		}
 		return err
@@ -107,39 +125,50 @@ func seed_db(db *bolt.DB) {
 	must(err)
 }
 
-func main() {
-	db, err := bolt.Open("store.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
-	if err != nil {
-		log.Fatal(err)
-	}
+func create_buckets(db *bolt.DB) {
 	db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucket([]byte("APIS"))
+		_, err := tx.CreateBucketIfNotExists([]byte("Sessions"))
 		if err != nil {
 			return fmt.Errorf("Create bucket: %s", err)
 		}
 		return nil
 	})
+	db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte("APIS"))
+		if err != nil {
+			return fmt.Errorf("Create bucket: %s", err)
+		}
+		return nil
+	})
+}
+
+var db *bolt.DB
+var router *mux.Router
+
+func main() {
+	var err error
+	db, err = bolt.Open("store.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer db.Close()
 
+	// Initialize datastore
+	create_buckets(db)
 	seed_db(db)
 
 	db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("APIS"))
 		v := b.Get([]byte("a"))
-		fmt.Printf("Value for key 'a': %s\n", v)
+		var data *Endpoint
+		json.Unmarshal(v, &data)
+		fmt.Printf("Value for key 'a': %s\n", data)
 		return nil
 	})
 
-	remote, err := url.Parse("https://alpha-api-nightly.mol.ai")
-	if err != nil {
-		panic(err)
-	}
-
-	proxy := httputil.NewSingleHostReverseProxy(remote)
-	router := mux.NewRouter()
-
-	router.HandleFunc("/balance/{address}", get_balance)
-	router.PathPrefix("/endpoint/{id}/{path:.*}").HandlerFunc(handler(proxy))
+	router = mux.NewRouter()
+	router.HandleFunc("/balance/{address}", get_balance_handler)
+	router.HandleFunc("/endpoint/{id}/{path:.*}", proxy_handler)
 
 	err = http.ListenAndServe(":8080", router)
 	if err != nil {
@@ -147,41 +176,69 @@ func main() {
 	}
 }
 
-func get_balance(w http.ResponseWriter, req *http.Request) {
+func get_balance_handler(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 
-	api, err := ComposeAPI(HTTPClientSettings{URI: endpoint})
-	must(err)
-
-	// GetNewAddress retrieves the first unspent from address through IRI
-	// The 100 argument represents only fully confirmed transactions
 	address := trinary.Trytes(vars["address"])
-	log.Println(address)
-
-	balances, err := api.GetBalances(trinary.Hashes{address}, 100)
-	must(err)
-	log.Println("\nBalance:", balances.Balances[0], " - According to milestone", balances.MilestoneIndex)
+	balance := GetBalance(address)
+	log.Println("Balance:", balance)
 }
 
-func handler(p *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		limiter := getVisitor(r.RemoteAddr)
-		if limiter.Allow() == false {
-			http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
-			return
+func proxy_handler(w http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	// Use IP for now
+	// key := vars["apiKey"] //TODO: we need to generate an API key with consumer seed for Session
+	id := vars["id"]
+	path := vars["path"]
+
+	var p *httputil.ReverseProxy
+	var apiData *Endpoint
+
+	err_endpoint := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("APIS"))
+		v := b.Get([]byte(id))
+
+		if err := json.Unmarshal(v, &apiData); err != nil {
+			return err
 		}
 
-		vars := mux.Vars(r)
-		id := vars["id"]
-		path := vars["path"]
+		log.Println("Endpoint:", apiData)
 
-		log.Println("Getting", path, "from API with ID", id)
+		remote, err := url.Parse(string(apiData.Url))
+		must(err)
+		p = httputil.NewSingleHostReverseProxy(remote)
 
-		r.Host = ""
-		r.URL.Path = path
+		producer_balance := GetBalance(apiData.Address)
+		log.Println("Producer balance:", producer_balance)
 
-		p.ServeHTTP(w, r)
+		return nil
+	})
+	if err_endpoint != nil {
+		http.Error(w, http.StatusText(404), http.StatusNotFound)
+		return
 	}
+
+	session := getSession(
+		req.RemoteAddr,
+		"JXBIEWEBYCZOKBHIGDXT9VNLUTGCZGXJLCSAUTCRGEEHFETHRIVMTBNKGPQUXNVSCLIWEKHWFBASGYFLWZOGJE9YPX",
+		apiData.Address,
+	)
+	validTX := validateTransaction(session)
+	if validTX {
+		log.Println("Valid TX:", session.id, session.expected_value)
+	}
+	limiter := session.limiter
+	if limiter.Allow() == false || !validTX {
+		http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
+		return
+	}
+
+	log.Println("Getting path", path, "from Endpoint with ID", id)
+
+	req.Host = ""
+	req.URL.Path = path
+
+	p.ServeHTTP(w, req)
 }
 
 func must(err error) {
