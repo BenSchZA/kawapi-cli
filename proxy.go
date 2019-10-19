@@ -20,54 +20,67 @@ import(
 
 //https://www.alexedwards.net/blog/how-to-rate-limit-http-requests
 
-// Create a custom visitor struct which holds the rate limiter for each
-// visitor and the last time that the visitor was seen.
-type visitor struct {
+// Create a custom session struct which holds the rate limiter for each
+// session and the last time that the session was seen.
+type session struct {
 	limiter  *rate.Limiter
 	lastSeen time.Time
+	consumer string
+	producer string
+	paid_value uint64
+	expected_value uint64
 }
 
-// Change the the map to hold values of the type visitor.
-var visitors = make(map[string]*visitor)
+// Change the the map to hold values of the type session.
+var sessions = make(map[string]*session)
 var mtx sync.Mutex
 
-// Run a background goroutine to remove old entries from the visitors map.
+// Run a background goroutine to remove old entries from the sessions map.
 func init() {
-	go cleanupVisitors()
+	go cleanupSessions()
 }
 
-func addVisitor(ip string) *rate.Limiter {
+func addSession(ip string) *session {
 	limiter := rate.NewLimiter(2, 5)
 	mtx.Lock()
-	// Include the current time when creating a new visitor.
-	visitors[ip] = &visitor{limiter, time.Now()}
+	// Include the current time when creating a new session.
+	value := session{
+		limiter: limiter, 
+		lastSeen: time.Now(),
+		consumer: "consumer",
+		producer: "producer",
+		paid_value: 0,
+		expected_value: 0,
+	}
+	sessions[ip] = &value
 	mtx.Unlock()
-	return limiter
+	log.Println("New session:", ip)
+	return &value
 }
 
-func getVisitor(ip string) *rate.Limiter {
+func getSession(ip string) *session {
 	mtx.Lock()
-	v, exists := visitors[ip]
+	v, exists := sessions[ip]
 	if !exists {
 		mtx.Unlock()
-		return addVisitor(ip)
+		return addSession(ip)
 	}
 
-	// Update the last seen time for the visitor.
+	// Update the last seen time for the session.
 	v.lastSeen = time.Now()
 	mtx.Unlock()
-	return v.limiter
+	return v
 }
 
-// Every minute check the map for visitors that haven't been seen for
-// more than 3 minutes and delete the entries.
-func cleanupVisitors() {
+// Every minute check the map for sessions that haven't been seen for
+// more than 10 minutes and delete the entries.
+func cleanupSessions() {
 	for {
 		time.Sleep(time.Minute)
 		mtx.Lock()
-		for ip, v := range visitors {
-			if time.Now().Sub(v.lastSeen) > 3*time.Minute {
-				delete(visitors, ip)
+		for ip, v := range sessions {
+			if time.Now().Sub(v.lastSeen) > 10*time.Minute {
+				delete(sessions, ip)
 			}
 		}
 		mtx.Unlock()
@@ -103,7 +116,14 @@ func seed_db(db *bolt.DB) {
 	must(err)
 }
 
-func create_bucket(db *bolt.DB) {
+func create_buckets(db *bolt.DB) {
+	db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucket([]byte("Sessions"))
+		if err != nil {
+			return fmt.Errorf("Create bucket: %s", err)
+		}
+		return nil
+	})
 	db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucket([]byte("APIS"))
 		if err != nil {
@@ -125,7 +145,7 @@ func main() {
 	defer db.Close()
 
 	// Initialize datastore
-	create_bucket(db)
+	create_buckets(db)
 	seed_db(db)
 
 	db.View(func(tx *bolt.Tx) error {
@@ -145,6 +165,33 @@ func main() {
 	}
 }
 
+// struct session {
+// 	key string
+// 	expiry time.Time
+// 	consumer string
+// 	producer string
+// 	paid_value uint64
+// 	expected_value uint64
+// }
+// func purgeExpiredSessions(db *bolt.DB) {
+// 	db.Update(func(tx *bolt.Tx) error {
+// 		// Assume bucket exists and has keys
+// 		b := tx.Bucket([]byte("Sessions"))
+// 		c := b.Cursor()
+	
+// 		now := time.Now()
+// 		for k, v := c.First(); k != nil; k, v = c.Next() {
+// 			fmt.Printf("key=%s, value=%s\n", k, v)
+// 			if v.expiry.After(now) {
+// 				fmt.Printf("Purging session:", k)
+// 				c.Delete()
+// 			}
+// 		}
+		
+// 		return nil
+// 	})
+// }
+
 func get_balance_handler(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 
@@ -154,18 +201,21 @@ func get_balance_handler(w http.ResponseWriter, req *http.Request) {
 }
 
 func proxy_handler(w http.ResponseWriter, req *http.Request) {
-	producer_balance := GetBalance(os.Getenv("ADDRESS_PRODUCER"))
-	log.Println("Producer balance:", producer_balance)
-
-	limiter := getVisitor(req.RemoteAddr)
-	if limiter.Allow() == false {
-			http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
-			return
-	}
-	
 	vars := mux.Vars(req)
+	// Use IP for now
+	// key := vars["apiKey"] //TODO: we need to generate an API key with consumer seed for session
 	id := vars["id"]
 	path := vars["path"]
+	
+	session := getSession(req.RemoteAddr)
+	limiter := session.limiter
+	if limiter.Allow() == false {
+		http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
+		return
+	}
+
+	producer_balance := GetBalance(os.Getenv("ADDRESS_PRODUCER"))
+	log.Println("Producer balance:", producer_balance)
 
 	var p *httputil.ReverseProxy
 
