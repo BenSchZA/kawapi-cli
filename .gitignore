@@ -7,3 +7,4 @@
 .envrc
 .history/
 store.db
+venv/
