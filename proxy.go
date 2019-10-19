@@ -39,7 +39,7 @@ func addSession(ip string, consumer string, producer string) *Session {
 		lastSeen: time.Now(),
 		consumer: consumer,
 		producer: producer,
-		initial_value: GetBalance(consumer),
+		initial_value: GetTagValue(consumer, producer, "VALTEST"), //TODO: set tag
 		paid_value: 0,
 		expected_value: 0,
 	}
@@ -85,7 +85,7 @@ var txBuffer uint64 = 10
 
 func validateTransaction(session *Session) bool {
 	session.expected_value = session.expected_value + txPrice
-	session.paid_value = GetBalance(session.consumer) - session.initial_value //TODO: set as tx between
+	session.paid_value = GetTagValue(session.consumer, session.producer, "VALTEST") - session.initial_value //TODO: set tag
 	sessions[session.id] = session
 	if session.expected_value - session.paid_value > txBuffer {
 		return false
@@ -207,9 +207,6 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 		must(err)
 		p = httputil.NewSingleHostReverseProxy(remote)
 
-		producer_balance := GetBalance(apiData.Address)
-		log.Println("Producer balance:", producer_balance)
-
 		return nil
 	})
 	if err_endpoint != nil {
@@ -222,6 +219,9 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 		"JXBIEWEBYCZOKBHIGDXT9VNLUTGCZGXJLCSAUTCRGEEHFETHRIVMTBNKGPQUXNVSCLIWEKHWFBASGYFLWZOGJE9YPX", 
 		apiData.Address,
 	)
+
+	log.Println("Session value:", session.paid_value)
+
 	validTX := validateTransaction(session)
 	if validTX {
 		log.Println("Valid TX:", session.id, session.expected_value)
