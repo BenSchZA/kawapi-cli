@@ -41,18 +41,23 @@ func getDataSources() []Endpoint {
 	return results
 }
 
+func getAuthtoken(provider: string) string {
+
+}
+
 func main() {
 	info()
 	var endpoints = getDataSources()
-	fmt.Println("Please select an endpoint:")
+
+	fmt.Println("Please select an endpoint by ID:")
 	for _, element := range endpoints {
-		fmt.Println(element.Id, " - ", element.Url)
+		fmt.Println("Id: ", element.Id, " - ", element.Url)
 	}
 
 	reader := bufio.NewReader(os.Stdin)
 	text, _ := reader.ReadString('\n')
 
-	fmt.Printf("You selected %s", text)
+	var token = getAuthtoken(text)
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)

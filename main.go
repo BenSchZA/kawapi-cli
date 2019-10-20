@@ -19,6 +19,11 @@ import (
 	"golang.org/x/time/rate"
 )
 
+var txPrice uint64 = 1
+var txBuffer uint64 = 10
+var txRate rate.Limit = 2
+var txBurst int = 5
+
 //https://www.alexedwards.net/blog/how-to-rate-limit-http-requests
 
 // Change the the map to hold values of the type Session.
@@ -31,17 +36,17 @@ func init() {
 }
 
 func addSession(ip string, consumer string, producer string) *Session {
-	limiter := rate.NewLimiter(2, 5)
+	limiter := rate.NewLimiter(txRate, txBurst)
 	mtx.Lock()
 	// Include the current time when creating a new Session.
-	value := Session{
-		id:             ip,
-		limiter:        limiter,
-		lastSeen:       time.Now(),
-		consumer:       consumer,
-		producer:       producer,
-		initial_value:  GetBalance(consumer),
-		paid_value:     0,
+	value := Session {
+		id: ip,
+		limiter: limiter,
+		lastSeen: time.Now(),
+		consumer: consumer,
+		producer: producer,
+		initial_value: GetTagValue(consumer, producer, "VALTEST"), //TODO: set tag
+		paid_value: 0,
 		expected_value: 0,
 	}
 	sessions[ip] = &value
@@ -56,8 +61,6 @@ func getSession(ip string, consumer string, producer string) *Session {
 	if !exists {
 		mtx.Unlock()
 		return addSession(ip, consumer, producer)
-	} else {
-		log.Println("Session:", v)
 	}
 
 	// Update the last seen time for the Session.
@@ -81,12 +84,9 @@ func cleanupSessions() {
 	}
 }
 
-var txPrice uint64 = 1
-var txBuffer uint64 = 10
-
 func validateTransaction(session *Session) bool {
 	session.expected_value = session.expected_value + txPrice
-	session.paid_value = GetBalance(session.consumer) - session.initial_value //TODO: set as tx between
+	session.paid_value = GetTagValue(session.consumer, session.producer, "VALTEST") - session.initial_value //TODO: set tag
 	sessions[session.id] = session
 	if session.expected_value-session.paid_value > txBuffer {
 		return false
@@ -157,10 +157,19 @@ func main() {
 	create_buckets(db)
 	seed_db(db)
 
+	db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("APIS"))
+		v := b.Get([]byte("a"))
+		var data *Endpoint
+		json.Unmarshal(v, &data)
+		log.Println("Successfully seeded APIs:", data)
+		return nil
+	})
+
 	router = mux.NewRouter()
+	router.Handle("/", http.FileServer(http.Dir("./static")))
 	router.HandleFunc("/balance/{address}", get_balance_handler)
-	router.HandleFunc("/endpoint/{id}/{path:.*}", proxy_handler)
-	router.HandleFunc("/endpoint", get_endpoints_handler)
+	router.HandleFunc("/{token}/endpoint/{id}/{path:.*}", proxy_handler)
 
 	err = http.ListenAndServe(":8080", router)
 	if err != nil {
@@ -206,6 +215,7 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	// Use IP for now
 	// key := vars["apiKey"] //TODO: we need to generate an API key with consumer seed for Session
+	token := vars["token"]
 	id := vars["id"]
 	path := vars["path"]
 
@@ -226,9 +236,6 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 		must(err)
 		p = httputil.NewSingleHostReverseProxy(remote)
 
-		producer_balance := GetBalance(apiData.Address)
-		log.Println("Producer balance:", producer_balance)
-
 		return nil
 	})
 	if err_endpoint != nil {
@@ -237,25 +244,33 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	session := getSession(
-		req.RemoteAddr,
-		"JXBIEWEBYCZOKBHIGDXT9VNLUTGCZGXJLCSAUTCRGEEHFETHRIVMTBNKGPQUXNVSCLIWEKHWFBASGYFLWZOGJE9YPX",
+		token, //req.RemoteAddr, 
+		"JXBIEWEBYCZOKBHIGDXT9VNLUTGCZGXJLCSAUTCRGEEHFETHRIVMTBNKGPQUXNVSCLIWEKHWFBASGYFLWZOGJE9YPX", 
 		apiData.Address,
 	)
+
+	diff := int64(session.paid_value - session.expected_value)
+	log.Println("Session", token, "outstanding value:", diff)
+
 	validTX := validateTransaction(session)
 	if validTX {
-		log.Println("Valid TX:", session.id, session.expected_value)
+		log.Println("Valid TX:", session.id)
+	} else {
+		http.Error(w, http.StatusText(402), http.StatusPaymentRequired)
+		log.Println("Payment required:", session.id)
+		return
 	}
+
 	limiter := session.limiter
-	if limiter.Allow() == false || !validTX {
+	if limiter.Allow() == false {
 		http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
+		log.Println("Rate limit exceeded:", session.id)
 		return
 	}
 
 	log.Println("Getting path", path, "from Endpoint with ID", id)
-
 	req.Host = ""
 	req.URL.Path = path
-
 	p.ServeHTTP(w, req)
 }
 
