@@ -1,0 +1,19 @@
+.row {
+    display: flex;
+}
+
+.column {
+    flex: 25%;
+    padding: 5px;
+}
+
+@media screen and (max-width: 500px) {
+    .column {
+        width: 100%;
+    }
+}
+
+.box {
+    display: flex;
+    justify-content: space-around;
+}
