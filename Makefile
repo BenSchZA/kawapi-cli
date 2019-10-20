@@ -1,2 +1,2 @@
 build:
-	go build main.go types.go iota-api.go
+	go build -o ./bin/main main.go types.go iota-api.go
