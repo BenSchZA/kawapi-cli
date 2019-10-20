@@ -8,6 +8,12 @@ KawAPI is a bridge between data consumers and data producers. It is a tool that 
 
 Open http://www.kawapi.io/37c1e3be-da52-4f85-b97d-b407639ffe7b/endpoint/molecule/api/project in your browser. You'll get 10 free transactions per session before the server responds that you need to start sending IOTA micro-transactions.
 
+## Inspiration
+
+We believe there are industries with large datasets that have non-trivial value, and no easy way to open up these datasets. We'd like to create a way to value and provide access to these datasets, with dynamic pricing based on the consumer and producer requirements.
+
+When Google gives you a Google Form to request access to paid APIs, that's when you know the current system is broken: https://docs.google.com/forms/d/e/1FAIpQLScK9o4sb96aJMRsK9UUCAiKLjQRJGyrBg2d9XKSL9rOFfpOzg/viewform
+
 ## The Tech
 
 ![system-diagram](/media/system.png)
