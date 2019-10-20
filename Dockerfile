@@ -21,4 +21,5 @@ COPY --from=builder /build/static/ /app/static/
 # Copy our static executable.
 COPY --from=builder /build/bin/main /app/bin/main
 # Run the hello binary.
+EXPOSE 8080
 ENTRYPOINT ["/app/bin/main"]

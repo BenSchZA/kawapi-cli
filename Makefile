@@ -16,3 +16,6 @@ docker-run:
 
 docker-push:
 	docker push yodascholtz/kawapi:latest
+
+push-heroku:
+	heroku container:login && heroku container:push web
