@@ -20,7 +20,12 @@ When Google gives you a Google Form to request access to paid APIs, that's when 
 
 KawAPI uses IOTA to perform microtransactions for dynamically priced data streams. It consists of a client CLI that securely manages the transactions from your IOTA wallet, and a server that acts as a reverse proxy between the consumer and the producer, to securely provide access to datasets and APIs.
 
-The server is hosted at kawapi.io, but could be self hosted. Your seed never leaves your side, and all code is open-source. 
+The server is hosted at kawapi.io, but could be self hosted. Your seed never leaves your side, and all code is open-source.
+
+* rate limiting, pagination, free preview tiers, etc.
+* value datasets by access bandwidth rather than selling the actual dataset
+* if you have a machine learning model that needs access to the dataset at a high tx rate, you'd pay more than someone who wanted a sample of the first 100 entries
+* pay for computation CPU load
 
 ## Roadmap
 
