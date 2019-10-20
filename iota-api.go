@@ -1,15 +1,13 @@
 package main
 
 import (
-	"os"
-
 	. "github.com/iotaledger/iota.go/api"
 	"github.com/iotaledger/iota.go/bundle"
 	"github.com/iotaledger/iota.go/converter"
 	"github.com/iotaledger/iota.go/trinary"
 )
 
-var endpoint = os.Getenv("API")
+var endpoint = "https://nodes.devnet.thetangle.org"
 
 func GetBalance(address trinary.Trytes) uint64 {
 	// GetNewAddress retrieves the first unspent from address through IRI

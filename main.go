@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -153,6 +154,9 @@ func determineListenAddress() (string, error) {
 }
 
 func main() {
+	addr, err_port := determineListenAddress()
+	must(err_port)
+
 	var err error
 	db, err = bolt.Open("store.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
@@ -178,7 +182,7 @@ func main() {
 	router.HandleFunc("/balance/{address}", get_balance_handler)
 	router.HandleFunc("/{token}/endpoint/{id}/{path:.*}", proxy_handler)
 
-	err = http.ListenAndServe(":8080", router)
+	err = http.ListenAndServe(addr, router)
 	if err != nil {
 		panic(err)
 	}
