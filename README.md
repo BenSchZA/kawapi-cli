@@ -10,6 +10,8 @@ Open http://www.kawapi.io/37c1e3be-da52-4f85-b97d-b407639ffe7b/endpoint/molecule
 
 ## The Tech
 
+![system-diagram](/media/system.png)
+
 KawAPI uses IOTA to perform microtransactions for dynamically priced data streams. It consists of a client CLI that securely manages the transactions from your IOTA wallet, and a server that acts as a reverse proxy between the consumer and the producer, to securely provide access to datasets and APIs.
 
 The server is hosted at kawapi.io, but could be self hosted. Your seed never leaves your side, and all code is open-source. 
