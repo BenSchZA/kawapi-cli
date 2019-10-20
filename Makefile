@@ -28,3 +28,6 @@ release-heroku:
 
 logs:
 	heroku logs --tail
+
+format:
+	go fmt
