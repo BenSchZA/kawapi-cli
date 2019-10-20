@@ -9,6 +9,7 @@
 .envrc
 .history/
 store.db
+store.db.lock
 venv/
 bin/
 .vscode/
