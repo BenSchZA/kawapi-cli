@@ -1,21 +1,23 @@
 package main
 
-import(
+import (
+	"os"
+	"encoding/json"
 	"fmt"
-	"time"
-	"sync"
 	"log"
-	"net/url"
 	"net/http"
 	"net/http/httputil"
-	"encoding/json"
+	"net/url"
+	"sync"
+	"time"
 
-	"github.com/iotaledger/iota.go/trinary"
 	"github.com/gorilla/mux"
+	"github.com/iotaledger/iota.go/trinary"
 	// "github.com/didip/tollbooth"
 	// "github.com/throttled/throttled"
-	"golang.org/x/time/rate"
 	"github.com/boltdb/bolt"
+	"golang.org/x/time/rate"
+	"github.com/common-nighthawk/go-figure"
 )
 
 var txPrice uint64 = 1
@@ -38,14 +40,14 @@ func addSession(ip string, consumer string, producer string) *Session {
 	limiter := rate.NewLimiter(txRate, txBurst)
 	mtx.Lock()
 	// Include the current time when creating a new Session.
-	value := Session {
-		id: ip,
-		limiter: limiter,
-		lastSeen: time.Now(),
-		consumer: consumer,
-		producer: producer,
-		initial_value: GetTagValue(consumer, producer, "VALTEST"), //TODO: set tag
-		paid_value: 0,
+	value := Session{
+		id:             ip,
+		limiter:        limiter,
+		lastSeen:       time.Now(),
+		consumer:       consumer,
+		producer:       producer,
+		initial_value:  GetTagValue(consumer, producer, "VALTEST"), //TODO: set tag
+		paid_value:     0,
 		expected_value: 0,
 	}
 	sessions[ip] = &value
@@ -87,22 +89,22 @@ func validateTransaction(session *Session) bool {
 	session.expected_value = session.expected_value + txPrice
 	session.paid_value = GetTagValue(session.consumer, session.producer, "VALTEST") - session.initial_value //TODO: set tag
 	sessions[session.id] = session
-	if session.expected_value - session.paid_value > txBuffer {
+	if session.expected_value-session.paid_value > txBuffer {
 		return false
 	} else {
 		return true
 	}
 }
 
-var seeds =  []Endpoint {
-	Endpoint {
-		Id: "a",
-		Url:  "https://alpha-api-nightly.mol.ai",
+var seeds = []Endpoint{
+	Endpoint{
+		Id:      "molecule",
+		Url:     "https://alpha-api-nightly.mol.ai",
 		Address: "FMYHLHBSJJMJZNPVUOKDCUSFOPQAGPBSPOPMFVBGXUUDFPEWPXREZFQKGKSNHZWDMODRDYWIXQT9CLVBXGPANCSYBW",
 	},
-	Endpoint {
-		Id: "b",
-		Url:  "https://google.com",
+	Endpoint{
+		Id:      "google",
+		Url:     "https://google.com",
 		Address: "FMYHLHBSJJMJZNPVUOKDCUSFOPQAGPBSPOPMFVBGXUUDFPEWPXREZFQKGKSNHZWDMODRDYWIXQT9CLVBXGPANCSYBW",
 	},
 }
@@ -115,7 +117,7 @@ func seed_db(db *bolt.DB) {
 			encoded, err_json := json.Marshal(api)
 			must(err_json)
 			log.Println("Seeding:", api.Id, api)
-			
+
 			err = b.Put([]byte(api.Id), encoded)
 			must(err)
 		}
@@ -144,7 +146,21 @@ func create_buckets(db *bolt.DB) {
 var db *bolt.DB
 var router *mux.Router
 
+func determineListenAddress() (string, error) {
+	port := os.Getenv("PORT")
+	if port == "" {
+		return "", fmt.Errorf("$PORT not set")
+	}
+	return ":" + port, nil
+}
+
 func main() {
+	splash := figure.NewFigure("KawAPI", "", true)
+	splash.Print()
+
+	addr, err_port := determineListenAddress()
+	must(err_port)
+
 	var err error
 	db, err = bolt.Open("store.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
@@ -170,7 +186,7 @@ func main() {
 	router.HandleFunc("/balance/{address}", get_balance_handler)
 	router.HandleFunc("/{token}/endpoint/{id}/{path:.*}", proxy_handler)
 
-	err = http.ListenAndServe(":8080", router)
+	err = http.ListenAndServe(addr, router)
 	if err != nil {
 		panic(err)
 	}
@@ -217,8 +233,8 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	session := getSession(
-		token, //req.RemoteAddr, 
-		"JXBIEWEBYCZOKBHIGDXT9VNLUTGCZGXJLCSAUTCRGEEHFETHRIVMTBNKGPQUXNVSCLIWEKHWFBASGYFLWZOGJE9YPX", 
+		token, //req.RemoteAddr,
+		"JXBIEWEBYCZOKBHIGDXT9VNLUTGCZGXJLCSAUTCRGEEHFETHRIVMTBNKGPQUXNVSCLIWEKHWFBASGYFLWZOGJE9YPX",
 		apiData.Address,
 	)
 
@@ -249,6 +265,6 @@ func proxy_handler(w http.ResponseWriter, req *http.Request) {
 
 func must(err error) {
 	if err != nil {
-			panic(err)
+		panic(err)
 	}
 }

@@ -16,10 +16,9 @@ RUN make build
 ############################
 # STEP 2 build a small image
 ############################
-FROM scratch
+FROM alpine:3.10
 COPY --from=builder /build/static/ /static/
 # Copy our static executable.
 COPY --from=builder /build/bin/main /app/bin/main
 # Run the hello binary.
-EXPOSE 8080
 CMD ["/app/bin/main"]
