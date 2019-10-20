@@ -4,8 +4,15 @@ fetch:
 build:
 	CGO_ENABLED=0 go build -o ./bin/main main.go types.go iota-api.go
 
+
+PHONY: deploy
+deploy: docker-build docker-push
+
 docker-build:
-	docker build -t kawapi:latest .
+	docker build -t yodascholtz/kawapi:latest .
 
 docker-run:
-	docker run -p 8080:8080 kawapi:latest
+	docker run -p 8080:8080 yodascholtz/kawapi:latest
+
+docker-push:
+	docker push yodascholtz/kawapi:latest
