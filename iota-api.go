@@ -4,9 +4,9 @@ import (
 	"os"
 
 	. "github.com/iotaledger/iota.go/api"
-	"github.com/iotaledger/iota.go/trinary"
-	"github.com/iotaledger/iota.go/converter"
 	"github.com/iotaledger/iota.go/bundle"
+	"github.com/iotaledger/iota.go/converter"
+	"github.com/iotaledger/iota.go/trinary"
 )
 
 var endpoint = os.Getenv("API")
@@ -29,21 +29,21 @@ func GetTagValue(consumer string, producer string, tag string) uint64 {
 			bundle.PadTag(trinary.Trytes(tag)),
 		},
 		Addresses: trinary.Hashes{
-			trinary.Trytes(consumer), 
+			trinary.Trytes(consumer),
 			trinary.Trytes(producer),
 		},
 	}
 
 	api, err := ComposeAPI(HTTPClientSettings{URI: endpoint})
 	must(err)
-	
+
 	transactions, err := api.FindTransactionObjects(query)
 	must(err)
-	
+
 	var tx_sum int64 = 0
-    for _, tx := range transactions {
-        // To get our message back we need to convert the signatureMessageFragment to ASCII
-        // We should strip all suffix 9's from the signatureMessageFragment, we use a
+	for _, tx := range transactions {
+		// To get our message back we need to convert the signatureMessageFragment to ASCII
+		// We should strip all suffix 9's from the signatureMessageFragment, we use a
 		// custom function to do this.
 		if len(removeSuffixNine(tx.SignatureMessageFragment))%2 == 0 {
 			_, err := converter.TrytesToASCII(removeSuffixNine(tx.SignatureMessageFragment))
@@ -56,13 +56,13 @@ func GetTagValue(consumer string, producer string, tag string) uint64 {
 }
 
 func removeSuffixNine(frag string) string {
-    fraglen := len(frag)
-    var firstNonNineAt int
-    for i := fraglen - 1; i > 0; i-- {
-         if frag[i] != '9' {
-             firstNonNineAt = i
-             break;
-        }
-    }
-    return frag[:firstNonNineAt+1]
+	fraglen := len(frag)
+	var firstNonNineAt int
+	for i := fraglen - 1; i > 0; i-- {
+		if frag[i] != '9' {
+			firstNonNineAt = i
+			break
+		}
+	}
+	return frag[:firstNonNineAt+1]
 }
