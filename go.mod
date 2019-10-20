@@ -2,6 +2,7 @@ module .
 
 require (
 	github.com/boltdb/bolt v1.3.1 // indirect
+	github.com/common-nighthawk/go-figure v0.0.0-20190529165535-67e0ed34491a // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/didip/tollbooth v4.0.2+incompatible // indirect
 	github.com/didip/tollbooth_httprouter v0.0.0-20170928042012-f7d42d1bfca5 // indirect

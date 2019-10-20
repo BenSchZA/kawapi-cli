@@ -17,6 +17,7 @@ import (
 	// "github.com/throttled/throttled"
 	"github.com/boltdb/bolt"
 	"golang.org/x/time/rate"
+	"github.com/common-nighthawk/go-figure"
 )
 
 var txPrice uint64 = 1
@@ -97,12 +98,12 @@ func validateTransaction(session *Session) bool {
 
 var seeds = []Endpoint{
 	Endpoint{
-		Id:      "a",
+		Id:      "molecule",
 		Url:     "https://alpha-api-nightly.mol.ai",
 		Address: "FMYHLHBSJJMJZNPVUOKDCUSFOPQAGPBSPOPMFVBGXUUDFPEWPXREZFQKGKSNHZWDMODRDYWIXQT9CLVBXGPANCSYBW",
 	},
 	Endpoint{
-		Id:      "b",
+		Id:      "google",
 		Url:     "https://google.com",
 		Address: "FMYHLHBSJJMJZNPVUOKDCUSFOPQAGPBSPOPMFVBGXUUDFPEWPXREZFQKGKSNHZWDMODRDYWIXQT9CLVBXGPANCSYBW",
 	},
@@ -154,6 +155,9 @@ func determineListenAddress() (string, error) {
 }
 
 func main() {
+	splash := figure.NewFigure("KawAPI", "", true)
+	splash.Print()
+
 	addr, err_port := determineListenAddress()
 	must(err_port)
 
