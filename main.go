@@ -18,6 +18,8 @@ import (
 	"github.com/boltdb/bolt"
 	"golang.org/x/time/rate"
 	"github.com/common-nighthawk/go-figure"
+	"golang.org/x/crypto/acme/autocert"
+	"crypto/tls"
 )
 
 var txPrice uint64 = 1
@@ -158,8 +160,14 @@ func main() {
 	splash := figure.NewFigure("KawAPI", "", true)
 	splash.Print()
 
-	addr, err_port := determineListenAddress()
-	must(err_port)
+	certManager := autocert.Manager{
+        Prompt:     autocert.AcceptTOS,
+        HostPolicy: autocert.HostWhitelist("kawapi.io"),
+        Cache:      autocert.DirCache("cert-cache"),
+	}
+
+	// addr, err_port := determineListenAddress()
+	// must(err_port)
 
 	var err error
 	db, err = bolt.Open("store.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
@@ -188,10 +196,19 @@ func main() {
 	router.HandleFunc("/balance/{address}", get_balance_handler)
 	router.HandleFunc("/{token}/endpoint/{id}/{path:.*}", proxy_handler)
 
-	err = http.ListenAndServe(addr, router)
-	if err != nil {
-		panic(err)
+	server := &http.Server{
+        Addr:      ":443",
+        Handler:   router,
+        TLSConfig: &tls.Config{
+            GetCertificate: certManager.GetCertificate,
+		},
+		ReadTimeout:  5 * time.Second,
+        WriteTimeout: 5 * time.Second,
+        IdleTimeout:  120 * time.Second,
 	}
+	
+	go http.ListenAndServe(":80", certManager.HTTPHandler(nil))
+    log.Fatal(server.ListenAndServeTLS("", "")) //Key and cert are coming from Let's Encrypt
 }
 
 func get_balance_handler(w http.ResponseWriter, req *http.Request) {
