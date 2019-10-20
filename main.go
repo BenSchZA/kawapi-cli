@@ -200,6 +200,32 @@ func get_balance_handler(w http.ResponseWriter, req *http.Request) {
 	log.Println("Balance:", balance)
 }
 
+func get_endpoints_handler(w http.ResponseWriter, req *http.Request) {
+	var endpoints []Endpoint
+	log.Println("getting endpoints")
+
+	db.View(func(tx *bolt.Tx) error {
+		// Assume bucket exists and has keys
+		b := tx.Bucket([]byte("APIS"))
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			var apiData Endpoint
+			if err := json.Unmarshal(v, &apiData); err != nil {
+				return err
+			}
+			endpoints = append(endpoints, apiData)
+		}
+		return nil
+	})
+
+	body, err := json.Marshal(endpoints)
+
+	if err != nil {
+
+	}
+	w.Write([]byte(body))
+}
+
 func proxy_handler(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	// Use IP for now
