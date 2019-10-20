@@ -9,7 +9,11 @@ import (
 	"net/http"
 
 	"github.com/manifoldco/promptui"
+	. "github.com/iotaledger/iota.go/api"
+    // "github.com/iotaledger/iota.go/trinary"
 )
+
+var endpoint = "https://nodes.devnet.thetangle.org"
 
 func getDataSources() []Endpoint {
 	resp, err := http.Get("http://localhost:8080/endpoint")
@@ -32,6 +36,25 @@ func getDataSources() []Endpoint {
 	return results
 }
 
+// func getAPIKey(provider: string) string {
+
+// }
+
+// func getMIOTAValue(address) uint64 {
+
+// }
+
+func getAddress(seed string) string {
+	api, err := ComposeAPI(HTTPClientSettings{URI: endpoint})
+    must(err)
+    
+    // GetNewAddress retrieves the first unspent from address through IRI
+    addresses, err := api.GetNewAddress(seed, GetNewAddressOptions{})
+    must(err)
+	
+	return addresses[0]
+}
+
 func main() {
 	validate := func(input string) error {
 		if len(input) <= 0 {
@@ -40,13 +63,13 @@ func main() {
 		return nil
 	}
 
-	prompt := promptui.Prompt{
+	seed_prompt := promptui.Prompt{
 		Label:    "Securely enter your seed",
 		Validate: validate,
 		Mask:     '*',
 	}
 
-	_, err := prompt.Run()
+	seed, err := seed_prompt.Run()
 
 	if err != nil {
 		fmt.Printf("Prompt failed %v\n", err)
@@ -73,4 +96,13 @@ func main() {
 	}
 
 	fmt.Printf("Connecting to endpoint %q...\n", result_endpoint)
+
+	address := getAddress(seed)
+	fmt.Println("\nUsing address:", address)
+}
+
+func must(err error) {
+    if err != nil {
+        panic(err)
+    }
 }
