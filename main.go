@@ -166,6 +166,7 @@ func main() {
 	})
 
 	router = mux.NewRouter()
+	router.Handle("/", http.FileServer(http.Dir("./static")))
 	router.HandleFunc("/balance/{address}", get_balance_handler)
 	router.HandleFunc("/{token}/endpoint/{id}/{path:.*}", proxy_handler)
 
