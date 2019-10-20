@@ -15,7 +15,7 @@ def timed_call(calls_per_second, callback, *args, **kw):
 
 # @limits(calls=60, period=60)
 def perform_request():
-    response = requests.get("http://localhost:8080/tokenABCD/endpoint/a/api/project")
+    response = requests.get("http://localhost:8080/37c1e3be-da52-4f85-b97d-b407639ffe7b/endpoint/molecule/api/project")
     print(response)
 
 # timed_call(1, perform_request)
