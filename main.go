@@ -161,7 +161,7 @@ func main() {
 		v := b.Get([]byte("a"))
 		var data *Endpoint
 		json.Unmarshal(v, &data)
-		fmt.Printf("Value for key 'a': %s\n", data)
+		log.Println("Successfully seeded APIs:", data)
 		return nil
 	})
 
