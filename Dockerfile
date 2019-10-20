@@ -17,9 +17,9 @@ RUN make build
 # STEP 2 build a small image
 ############################
 FROM scratch
-COPY --from=builder /build/static/ /app/static/
+COPY --from=builder /build/static/ /static/
 # Copy our static executable.
 COPY --from=builder /build/bin/main /app/bin/main
 # Run the hello binary.
 EXPOSE 8080
-ENTRYPOINT ["/app/bin/main"]
+CMD ["/app/bin/main"]

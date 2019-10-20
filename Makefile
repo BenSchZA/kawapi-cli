@@ -6,7 +6,7 @@ build:
 
 
 PHONY: deploy
-deploy: docker-build docker-push
+deploy: push-heroku release-heroku
 
 docker-build:
 	docker build -t yodascholtz/kawapi:latest .
@@ -19,3 +19,9 @@ docker-push:
 
 push-heroku:
 	heroku container:login && heroku container:push web
+
+release-heroku:
+	heroku container:login && heroku container:release web
+
+logs:
+	heroku logs --tail
