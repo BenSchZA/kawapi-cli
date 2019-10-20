@@ -183,6 +183,7 @@ func main() {
 
 	router = mux.NewRouter()
 	router.Handle("/", http.FileServer(http.Dir("./static")))
+	router.HandleFunc("/endpoint", get_endpoints_handler)
 	router.HandleFunc("/balance/{address}", get_balance_handler)
 	router.HandleFunc("/{token}/endpoint/{id}/{path:.*}", proxy_handler)
 
@@ -202,7 +203,7 @@ func get_balance_handler(w http.ResponseWriter, req *http.Request) {
 
 func get_endpoints_handler(w http.ResponseWriter, req *http.Request) {
 	var endpoints []Endpoint
-	log.Println("getting endpoints")
+	log.Println("Getting endpoints")
 
 	db.View(func(tx *bolt.Tx) error {
 		// Assume bucket exists and has keys
@@ -219,10 +220,8 @@ func get_endpoints_handler(w http.ResponseWriter, req *http.Request) {
 	})
 
 	body, err := json.Marshal(endpoints)
+	must(err)
 
-	if err != nil {
-
-	}
 	w.Write([]byte(body))
 }
 
