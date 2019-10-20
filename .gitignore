@@ -10,3 +10,4 @@
 .history/
 store.db
 venv/
+bin/

@@ -161,11 +161,12 @@ func main() {
 		v := b.Get([]byte("a"))
 		var data *Endpoint
 		json.Unmarshal(v, &data)
-		fmt.Printf("Value for key 'a': %s\n", data)
+		log.Println("Successfully seeded APIs:", data)
 		return nil
 	})
 
 	router = mux.NewRouter()
+	router.Handle("/", http.FileServer(http.Dir("./static")))
 	router.HandleFunc("/balance/{address}", get_balance_handler)
 	router.HandleFunc("/{token}/endpoint/{id}/{path:.*}", proxy_handler)
 
