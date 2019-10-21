@@ -9,7 +9,7 @@ run: build
 	./bin/main
 
 PHONY: deploy
-deploy: push-heroku release-heroku
+deploy: docker-build docker-push
 
 docker-build:
 	docker build -t yodascholtz/kawapi:latest .
@@ -19,15 +19,6 @@ docker-run:
 
 docker-push:
 	docker push yodascholtz/kawapi:latest
-
-push-heroku:
-	heroku container:login && heroku container:push web
-
-release-heroku:
-	heroku container:login && heroku container:release web
-
-logs:
-	heroku logs --tail
 
 format:
 	go fmt

@@ -1,13 +1,13 @@
 package main
 
 import (
-	"os"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 
@@ -15,11 +15,11 @@ import (
 	"github.com/iotaledger/iota.go/trinary"
 	// "github.com/didip/tollbooth"
 	// "github.com/throttled/throttled"
+	"crypto/tls"
 	"github.com/boltdb/bolt"
-	"golang.org/x/time/rate"
 	"github.com/common-nighthawk/go-figure"
 	"golang.org/x/crypto/acme/autocert"
-	"crypto/tls"
+	"golang.org/x/time/rate"
 )
 
 var txPrice uint64 = 1
@@ -161,9 +161,9 @@ func main() {
 	splash.Print()
 
 	certManager := autocert.Manager{
-        Prompt:     autocert.AcceptTOS,
-        HostPolicy: autocert.HostWhitelist("kawapi.io"),
-        Cache:      autocert.DirCache("cert-cache"),
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist("kawapi.io", "www.kawapi.io", "dev.kawapi.io"),
+		Cache:      autocert.DirCache("cert-cache"),
 	}
 
 	// addr, err_port := determineListenAddress()
@@ -197,18 +197,18 @@ func main() {
 	router.HandleFunc("/{token}/endpoint/{id}/{path:.*}", proxy_handler)
 
 	server := &http.Server{
-        Addr:      ":443",
-        Handler:   router,
-        TLSConfig: &tls.Config{
-            GetCertificate: certManager.GetCertificate,
+		Addr:    ":443",
+		Handler: router,
+		TLSConfig: &tls.Config{
+			GetCertificate: certManager.GetCertificate,
 		},
 		ReadTimeout:  5 * time.Second,
-        WriteTimeout: 5 * time.Second,
-        IdleTimeout:  120 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
-	
+
 	go http.ListenAndServe(":80", certManager.HTTPHandler(nil))
-    log.Fatal(server.ListenAndServeTLS("", "")) //Key and cert are coming from Let's Encrypt
+	log.Fatal(server.ListenAndServeTLS("", "")) //Key and cert are coming from Let's Encrypt
 }
 
 func get_balance_handler(w http.ResponseWriter, req *http.Request) {
