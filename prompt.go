@@ -13,8 +13,6 @@ import (
     // "github.com/iotaledger/iota.go/trinary"
 )
 
-var endpoint = "https://nodes.devnet.thetangle.org"
-
 func getDataSources() []Endpoint {
 	resp, err := http.Get("http://localhost:8080/endpoint")
 	if err != nil {

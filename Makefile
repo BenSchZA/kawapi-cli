@@ -4,9 +4,15 @@ fetch:
 build:
 	CGO_ENABLED=0 go build -o ./bin/main main.go types.go iota-api.go
 
-PHONY: run
+build-cli:
+	CGO_ENABLED=0 go build -o ./bin/cli prompt.go types.go iota-api.go
+
+PHONY: run run-cli
 run: build
 	./bin/main
+
+run-cli: build-cli
+	./bin/cli
 
 PHONY: deploy
 deploy: push-heroku release-heroku
