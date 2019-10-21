@@ -9,6 +9,17 @@ import (
 
 var endpoint = "https://nodes.devnet.thetangle.org"
 
+func GetAddress(seed string) string {
+	api, err := ComposeAPI(HTTPClientSettings{URI: endpoint})
+    must(err)
+    
+    // GetNewAddress retrieves the first unspent from address through IRI
+    addresses, err := api.GetNewAddress(seed, GetNewAddressOptions{})
+    must(err)
+	
+	return addresses[0]
+}
+
 func GetBalance(address trinary.Trytes) uint64 {
 	// GetNewAddress retrieves the first unspent from address through IRI
 	// The 100 argument represents only fully confirmed transactions

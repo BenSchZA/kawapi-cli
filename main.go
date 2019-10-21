@@ -157,6 +157,7 @@ func determineListenAddress() (string, error) {
 func main() {
 	splash := figure.NewFigure("KawAPI", "", true)
 	splash.Print()
+	fmt.Printf("\n")
 
 	addr, err_port := determineListenAddress()
 	must(err_port)

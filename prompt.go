@@ -9,8 +9,7 @@ import (
 	"net/http"
 
 	"github.com/manifoldco/promptui"
-	. "github.com/iotaledger/iota.go/api"
-    // "github.com/iotaledger/iota.go/trinary"
+	"github.com/common-nighthawk/go-figure"
 )
 
 func getDataSources() []Endpoint {
@@ -42,20 +41,13 @@ func getDataSources() []Endpoint {
 
 // }
 
-func getAddress(seed string) string {
-	api, err := ComposeAPI(HTTPClientSettings{URI: endpoint})
-    must(err)
-    
-    // GetNewAddress retrieves the first unspent from address through IRI
-    addresses, err := api.GetNewAddress(seed, GetNewAddressOptions{})
-    must(err)
-	
-	return addresses[0]
-}
-
 func main() {
+	splash := figure.NewFigure("KawAPI", "", true)
+	splash.Print()
+	fmt.Printf("\n")
+
 	validate := func(input string) error {
-		if len(input) <= 0 {
+		if len(input) != 81 {
 			return errors.New("Seed must have 81 characters, including the checksum")
 		}
 		return nil
@@ -95,7 +87,7 @@ func main() {
 
 	fmt.Printf("Connecting to endpoint %q...\n", result_endpoint)
 
-	address := getAddress(seed)
+	address := GetAddress(seed)
 	fmt.Println("\nUsing address:", address)
 }
 
