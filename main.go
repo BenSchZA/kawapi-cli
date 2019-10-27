@@ -10,6 +10,7 @@ import (
 	"os"
 	"sync"
 	"time"
+	"context"
 
 	"github.com/gorilla/mux"
 	"github.com/iotaledger/iota.go/trinary"
@@ -18,12 +19,21 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/common-nighthawk/go-figure"
 	"golang.org/x/time/rate"
+
+	"github.com/paulbellamy/ratecounter"
+	"google.golang.org/grpc"
+	pb "helloworld"
 )
 
 var txPrice uint64 = 1
 var txBuffer uint64 = 10
 var txRate rate.Limit = 2
 var txBurst int = 5
+
+const (
+	address     = "0.0.0.0:50051"
+	defaultName = "world"
+)
 
 //https://www.alexedwards.net/blog/how-to-rate-limit-http-requests
 
@@ -152,6 +162,47 @@ func determineListenAddress() (string, error) {
 		return "", fmt.Errorf("$PORT not set")
 	}
 	return ":" + port, nil
+}
+
+var counter = ratecounter.NewRateCounter(60 * time.Second)
+
+func startGrpc() {
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewGreeterClient(conn)
+
+	// Contact the server and print out its response.
+	name := defaultName
+	if len(os.Args) > 1 {
+		name = os.Args[1]
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	r, err := c.SayHello(ctx, &pb.HelloRequest{Name: name})
+	if err != nil {
+		log.Fatalf("could not greet: %v", err)
+	}
+	log.Printf("Greeting: %s", r.GetMessage())
+	// Record an event happening
+	counter.Incr(1)
+}
+
+func testGrpc() {
+	goTicker := time.NewTicker(1 * time.Nanosecond)
+	logTicker := time.NewTicker(10 * time.Second)
+	for {
+		select {
+			case <-goTicker.C:
+				go startGrpc()
+			case <-logTicker.C:
+				rate := counter.Rate() / 60
+				fmt.Printf("%d\n", rate)
+		} 
+	}
 }
 
 func main() {
