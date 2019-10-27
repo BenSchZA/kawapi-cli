@@ -25,6 +25,4 @@ COPY --from=builder /build/bin/main /app/bin/main
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 VOLUME ["/cert-cache"]
 # Run the hello binary.
-EXPOSE 443
-EXPOSE 80
 CMD ["/app/bin/main"]

@@ -182,6 +182,11 @@ func main() {
 	})
 
 	router = mux.NewRouter()
+
+	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	})
+
 	router.Handle("/", http.FileServer(http.Dir("./static")))
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 	router.HandleFunc("/endpoint", get_endpoints_handler)
